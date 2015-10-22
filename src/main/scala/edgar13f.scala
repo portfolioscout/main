@@ -9,6 +9,12 @@ object Edgar13F{
   val logger = Logger(LoggerFactory.getLogger("name"))
 
   def main (args: Array[String]){
+
+    def list(config: Config): Unit ={
+      logger.debug("option: "+config.mode + " "+config.cik)
+      Spray.Invoke()
+    }
+
     val parser = new scopt.OptionParser[Config]("scopt") {
       head("edgar13f", "0.1")
       opt[String]("cik") action { (x, c) =>
@@ -23,7 +29,7 @@ object Edgar13F{
     parser.parse(args, Config()) match {
       case Some(config) =>
       // do stuff
-        logger.debug("option: "+config.mode + " "+config.cik)
+      list(config)
 
       case None =>
       // arguments are bad, error message will have been displayed
