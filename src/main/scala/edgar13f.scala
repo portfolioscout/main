@@ -1,9 +1,13 @@
 package edgar13f
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 case class Config(cik: String = "", verbose: Boolean = false,
                   mode: String = "")
 
 object Edgar13F{
+  val logger = Logger(LoggerFactory.getLogger("name"))
+
   def main (args: Array[String]){
     val parser = new scopt.OptionParser[Config]("scopt") {
       head("edgar13f", "0.1")
@@ -12,16 +16,18 @@ object Edgar13F{
       opt[Unit]("verbose") action { (_, c) =>
         c.copy(verbose = true) } text("verbose output")
       help("help") text("prints this usage text")
-      cmd("update") action { (_, c) =>
-        c.copy(mode = "update") } text("obtain and update 13F forms.")
+      cmd("list") action { (_, c) =>
+        c.copy(mode = "list") } text("list 13F forms.")
     }
     // parser.parse returns Option[C]
     parser.parse(args, Config()) match {
       case Some(config) =>
       // do stuff
+        logger.debug("option: "+config.mode + " "+config.cik)
 
       case None =>
       // arguments are bad, error message will have been displayed
     }
+    logger.info("Finished")
   }
 }
