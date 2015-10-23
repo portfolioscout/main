@@ -1,11 +1,11 @@
-package edgar13f
+package edgar
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 case class Config(cik: String = "", verbose: Boolean = false,
                   mode: String = "")
 
-object Edgar13F{
+object Edgar{
   val logger = Logger(LoggerFactory.getLogger("name"))
 
   def main (args: Array[String]){

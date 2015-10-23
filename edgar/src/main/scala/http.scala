@@ -1,4 +1,4 @@
-package edgar13f
+package edgar
 
 import scala.util.{Success, Failure}
 import scala.concurrent.duration._
