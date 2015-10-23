@@ -12,7 +12,7 @@ object Edgar{
 
     def list(config: Config): Unit ={
       logger.debug("option: "+config.mode + " "+config.cik)
-      Spray.Invoke()
+      CompanyForms.Invoke(config.cik)
     }
 
     val parser = new scopt.OptionParser[Config]("scopt") {
