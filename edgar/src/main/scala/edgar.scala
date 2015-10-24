@@ -3,7 +3,7 @@ import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 case class Config(cik: String = "", verbose: Boolean = false,
-                  mode: String = "")
+                  mode: Option[Config=>Unit] = None)
 
 object Edgar{
   val logger = Logger(LoggerFactory.getLogger("name"))
@@ -12,7 +12,9 @@ object Edgar{
 
     def list(config: Config): Unit ={
       logger.debug("option: "+config.mode + " "+config.cik)
-      FormsWeb.Invoke(config.cik)
+      new FormCollectionWeb(config.cik).Invoke({forms=>
+        logger.debug("Fetched: "+forms.toString)
+      })
     }
 
     val parser = new scopt.OptionParser[Config]("scopt") {
@@ -23,13 +25,18 @@ object Edgar{
         c.copy(verbose = true) } text("verbose output")
       help("help") text("prints this usage text")
       cmd("list") action { (_, c) =>
-        c.copy(mode = "list") } text("list 13F forms.")
+        c.copy(mode = Some(list)) } text("list 13F forms.")
     }
     // parser.parse returns Option[C]
     parser.parse(args, Config()) match {
       case Some(config) =>
-      // do stuff
-      list(config)
+        if(config.mode.isEmpty) {
+          logger.error("Invalid mode")
+          parser.usage
+        } else {
+          (config.mode.get)(config)
+        }
+
 
       case None =>
       // arguments are bad, error message will have been displayed
