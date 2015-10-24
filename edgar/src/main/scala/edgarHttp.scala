@@ -16,10 +16,10 @@ import spray.util._
 import scala.xml.{Node, Elem, XML}
 
 case class ReqConfig(cik:String,
+                      start:Int = 0,
                       dateb:String="",
                       ftype:String="",
                       owner:String="",
-                      start:Int = 0,
                       count:Int=10,
                       output:String="atom",
                       url:String="http://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"){
@@ -52,35 +52,58 @@ case class XmlFormCollection(xml: Elem){
   override def toString:String = "name:\""+name.text+
     "\"\tcik:"+cik.text+
     "\tentries:"+entries.toList.size+
-    "\tlast:"+XmlForm(entries.last)
+    "\tlast:"+(if(!entries.isEmpty){XmlForm(entries.last)}else{""})
 }
 
 class FormCollectionWeb(cik:String, date:String="", formType:String="13F") extends LazyLogging {
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("edgar-spray-client")
   import system.dispatcher // execution context for futures below
+  private var forms:Seq[XmlFormCollection]=List()
 
-  def Invoke(f:XmlFormCollection=>Unit) {
+  def Invoke(f:Seq[XmlFormCollection]=>Unit) {
     logger.debug("Calling into edgar for cik: "+cik)
 
-    val pipeline = sendReceive ~> unmarshal[String]
-
-    val responseFuture = pipeline {
-      val r = ReqConfig(cik, date, formType)
-      logger.debug("GET: "+r.toString)
-      Get(r toString)
+    def responseFuture(start:Int) = {
+      val pipeline = sendReceive ~> unmarshal[String]
+      pipeline {
+        val r = ReqConfig(cik, start, date, formType)
+        logger.debug("GET: "+r.toString)
+        Get(r toString)
+      }
     }
-    responseFuture onComplete {
 
-      case Success(s) =>
-        val forms = XmlFormCollection(scala.xml.XML.loadString(s))
-        f(forms)
-        shutdown()
+    def futureOnComplete(start:Int):Unit =
+      responseFuture(start) onComplete {
 
-      case Failure(error) =>
-        logger.error("Couldn't get request. Error: "+error)
-        shutdown()
-    }
+        case Success(s) =>
+          logger.debug("onComplete success")
+          try {
+            val fm = XmlFormCollection(scala.xml.XML.loadString(s))
+            val sz = fm.entries.size
+            logger.debug("Returned forms: " + sz)
+            forms = forms ++ List(fm)
+            val start = (for (x <- forms) yield (x.entries.size)).foldLeft(0)(_ + _)
+            if (sz > 0) {
+              // query until it returns 0
+              logger.debug("Launch futureOnComplete with start=" + start)
+              futureOnComplete(start)
+            } else {
+              f(forms)
+              shutdown()
+            }
+          }catch{
+            case e:Exception =>
+              logger.error("Exception: "+e)
+              shutdown()
+          }
+
+        case Failure(error) =>
+          logger.error("Couldn't get request. Error: "+error)
+          shutdown()
+      }
+
+    futureOnComplete(0)
   }
 
   def shutdown(): Unit = {
