@@ -12,7 +12,7 @@ object Edgar{
 
     def list(config: Config): Unit ={
       logger.debug("option: "+config.mode + " "+config.cik)
-      CompanyForms.Invoke(config.cik)
+      FormsWeb.Invoke(config.cik)
     }
 
     val parser = new scopt.OptionParser[Config]("scopt") {
