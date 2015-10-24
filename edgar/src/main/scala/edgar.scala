@@ -2,7 +2,9 @@ package edgar
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-case class Config(cik: String = "", verbose: Boolean = false,
+case class Config(cik: String = "",
+                  verbose: Boolean = false,
+                  date:String = "",
                   mode: Option[Config=>Unit] = None)
 
 object Edgar{
@@ -12,7 +14,7 @@ object Edgar{
 
     def list(config: Config): Unit ={
       logger.debug("option: "+config.mode + " "+config.cik)
-      new FormCollectionWeb(config.cik).Invoke({forms=>
+      new FormCollectionWeb(config.cik,config.date).Invoke({forms=>
         if(forms.isEmpty){
           logger.info("No forms fetched")
         } else {
@@ -28,6 +30,8 @@ object Edgar{
       head("edgar13f", "0.1")
       opt[String]("cik") action { (x, c) =>
         c.copy(cik = x) } text("cik of a fund")
+      opt[String]("date") action { (x, c) =>
+        c.copy(date = x) } text("pull forms since date in the form YYYYMMDD")
       opt[Unit]("verbose") action { (_, c) =>
         c.copy(verbose = true) } text("verbose output")
       help("help") text("prints this usage text")

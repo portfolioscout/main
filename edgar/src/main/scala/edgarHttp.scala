@@ -19,7 +19,7 @@ case class ReqConfig(cik:String,
                       start:Int = 0,
                       dateb:String="",
                       ftype:String="",
-                      owner:String="",
+                      owner:String="include",
                       count:Int=10,
                       output:String="atom",
                       url:String="http://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"){
