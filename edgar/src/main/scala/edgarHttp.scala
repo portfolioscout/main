@@ -42,13 +42,12 @@ case class XmlForm(entry:Node){
   "filing date:"+filingDate.text
 }
 
-case class XmlFormCollection(xml: Elem){
+case class XmlFormCollection(xml: Elem, entries: Seq[Node]){
   val feed = xml \\ "feed"
   val author = feed \ "author"
   val companyInfo = feed \ "company-info"
   val name = companyInfo \ "conformed-name"
   val cik = companyInfo \ "cik"
-  val entries = feed \ "entry"
   override def toString:String = "name:\""+name.text+
     "\"\tcik:"+cik.text+
     "\tentries:"+entries.toList.size+
@@ -59,9 +58,9 @@ class FormCollectionWeb(cik:String, date:String="", formType:String="13F") exten
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("edgar-spray-client")
   import system.dispatcher // execution context for futures below
-  private var forms:Seq[XmlFormCollection]=List()
+  var forms1:Option[XmlFormCollection]=None
 
-  def Invoke(f:Seq[XmlFormCollection]=>Unit) {
+  def Invoke(f:Option[XmlFormCollection]=>Unit) {
     logger.debug("Calling into edgar for cik: "+cik)
 
     def responseFuture(start:Int) = {
@@ -73,23 +72,31 @@ class FormCollectionWeb(cik:String, date:String="", formType:String="13F") exten
       }
     }
 
-    def futureOnComplete(start:Int):Unit =
+    def loopTask(start:Int):Unit =
       responseFuture(start) onComplete {
 
         case Success(s) =>
           logger.debug("onComplete success")
           try {
-            val fm = XmlFormCollection(scala.xml.XML.loadString(s))
+            val xml = scala.xml.XML.loadString(s)
+            val fm = XmlFormCollection(xml, xml \\ "feed" \ "entry")
             val sz = fm.entries.size
+
+            if(forms1.isEmpty) {
+              forms1 = Some(fm)
+            }else if (sz>0){
+              val newEntries = forms1.get.entries  ++ fm.entries
+              forms1= Some(forms1.get.copy(entries=newEntries))
+            }
+
             logger.debug("Returned forms: " + sz)
-            forms = forms ++ List(fm)
-            val start = (for (x <- forms) yield (x.entries.size)).foldLeft(0)(_ + _)
             if (sz > 0) {
               // query until it returns 0
-              logger.debug("Launch futureOnComplete with start=" + start)
-              futureOnComplete(start)
+              val start = forms1.get.entries.size
+              logger.debug("Launch loopTask with start=" + start)
+              loopTask(start)
             } else {
-              f(forms)
+              f(forms1)
               shutdown()
             }
           }catch{
@@ -103,7 +110,7 @@ class FormCollectionWeb(cik:String, date:String="", formType:String="13F") exten
           shutdown()
       }
 
-    futureOnComplete(0)
+    loopTask(0)
   }
 
   def shutdown(): Unit = {

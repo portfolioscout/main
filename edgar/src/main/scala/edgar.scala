@@ -18,7 +18,7 @@ object Edgar{
         if(forms.isEmpty){
           logger.info("No forms fetched")
         } else {
-          val sz = (for(f<-forms) yield(f.entries.size)).foldLeft(0){_ + _}
+          val sz = forms.get.entries.size
           logger.debug("Fetched: "+forms.head.toString +
           "\t Total forms: "+sz)
         }
