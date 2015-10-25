@@ -1,6 +1,8 @@
 package edgar
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
+import scala.util.{Success, Failure}
+
 
 case class Config(cik: String = "",
                   verbose: Boolean = false,
@@ -13,16 +15,19 @@ object Edgar{
   def main (args: Array[String]){
 
     def list(config: Config): Unit ={
+      import scala.concurrent.ExecutionContext.Implicits.global
       logger.debug("option: "+config.mode + " "+config.cik)
-      new FormCollectionWeb(config.cik,config.date).Invoke({forms=>
-        if(forms.isEmpty){
-          logger.info("No forms fetched")
-        } else {
-          val sz = forms.get.entries.size
-          logger.debug("Fetched: "+forms.head.toString +
-          "\t Total forms: "+sz)
-        }
-
+      new FormWebCollector(config.cik,config.date).fetch().onComplete({
+        case(Success(forms)) =>
+          if(forms.isEmpty){
+            logger.info("No forms fetched")
+          } else {
+            val sz = forms.get.entries.size
+            logger.debug("Fetched: "+forms.head.toString +
+              "\t Total forms: "+sz)
+          }
+        case Failure(err) =>
+          logger.error("Error fetching forms: "+err)
       })
     }
 

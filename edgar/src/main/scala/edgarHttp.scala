@@ -1,5 +1,6 @@
 package edgar
 
+import scala.concurrent.{Promise, Future}
 import scala.util.{Success, Failure}
 import scala.concurrent.duration._
 import akka.actor.ActorSystem
@@ -54,14 +55,15 @@ case class XmlFormCollection(xml: Elem, entries: Seq[Node]){
     "\tlast:"+(if(!entries.isEmpty){XmlForm(entries.last)}else{""})
 }
 
-class FormCollectionWeb(cik:String, date:String="", formType:String="13F") extends LazyLogging {
+class FormWebCollector(cik:String, date:String="", formType:String="13F") extends LazyLogging {
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("edgar-spray-client")
   import system.dispatcher // execution context for futures below
   var forms1:Option[XmlFormCollection]=None
 
-  def Invoke(f:Option[XmlFormCollection]=>Unit) {
+  def fetch():Future[Option[XmlFormCollection]] ={
     logger.debug("Calling into edgar for cik: "+cik)
+    val p = Promise[Option[XmlFormCollection]]()
 
     def responseFuture(start:Int) = {
       val pipeline = sendReceive ~> unmarshal[String]
@@ -96,21 +98,24 @@ class FormCollectionWeb(cik:String, date:String="", formType:String="13F") exten
               logger.debug("Launch loopTask with start=" + start)
               loopTask(start)
             } else {
-              f(forms1)
+              p.success(forms1)
               shutdown()
             }
           }catch{
             case e:Exception =>
               logger.error("Exception: "+e)
+              p.failure(e)
               shutdown()
           }
 
         case Failure(error) =>
           logger.error("Couldn't get request. Error: "+error)
+          p.failure(error)
           shutdown()
       }
 
-    loopTask(0)
+    Future{loopTask(0)}
+    p.future
   }
 
   def shutdown(): Unit = {
