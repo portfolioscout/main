@@ -18,9 +18,9 @@ import scala.xml.{Node, Elem, XML}
 
 case class ReqConfig(cik:String,
                       start:Int = 0,
-                      dateb:String="",
+                     dateBefore:String="",
                       ftype:String="",
-                      owner:String="include",
+                      owner:String="include", // TODO apparently bug n sec API. Owner=exclude is ignored.
                       count:Int=10,
                       output:String="atom",
                       url:String="http://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"){
@@ -28,7 +28,7 @@ case class ReqConfig(cik:String,
     url+
     "&CIK="+cik+
     "&type="+ftype+
-    "&dateb="+dateb+
+    "&dateb="+dateBefore+
     "&owner="+owner+
     "&start="+start+
     "&count="+count+
@@ -47,15 +47,15 @@ case class XmlFormCollection(xml: Elem, entries: Seq[Node]){
   val feed = xml \\ "feed"
   val author = feed \ "author"
   val companyInfo = feed \ "company-info"
-  val name = companyInfo \ "conformed-name"
-  val cik = companyInfo \ "cik"
-  override def toString:String = "name:\""+name.text+
-    "\"\tcik:"+cik.text+
+  val name = companyInfo \ "conformed-name" text
+  val cik = companyInfo \ "cik" text
+  override def toString:String = "name:\""+name+
+    "\"\tcik:"+cik+
     "\tentries:"+entries.toList.size+
     "\tlast:"+(if(!entries.isEmpty){XmlForm(entries.last)}else{""})
 }
 
-class FormWebCollector(cik:String, date:String="", formType:String="13F") extends LazyLogging {
+class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") extends LazyLogging {
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("edgar-spray-client")
   import system.dispatcher // execution context for futures below
@@ -68,7 +68,7 @@ class FormWebCollector(cik:String, date:String="", formType:String="13F") extend
     def responseFuture(start:Int) = {
       val pipeline = sendReceive ~> unmarshal[String]
       pipeline {
-        val r = ReqConfig(cik, start, date, formType)
+        val r = ReqConfig(cik, start, dateBefore, formType)
         logger.debug("GET: "+r.toString)
         Get(r toString)
       }

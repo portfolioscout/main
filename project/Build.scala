@@ -15,7 +15,8 @@ object Build extends Build {
             "io.spray" % "spray-can_2.11" % "1.3.3",
             "io.spray" % "spray-httpx_2.11" % "1.3.3",
             "io.spray" % "spray-client_2.11" % "1.3.3",
-            "io.spray" % "spray-util_2.11" % "1.3.3"
+            "io.spray" % "spray-util_2.11" % "1.3.3",
+            "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test"
       ),
       resolvers += Resolver.sonatypeRepo("public"),
       fork in run := true
