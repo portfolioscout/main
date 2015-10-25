@@ -18,7 +18,7 @@ import scala.xml.{Node, Elem, XML}
 
 case class ReqConfig(cik:String,
                       start:Int = 0,
-                     dateBefore:String="",
+                      dateBefore:String="",
                       ftype:String="",
                       owner:String="include", // TODO apparently bug n sec API. Owner=exclude is ignored.
                       count:Int=10,
@@ -59,7 +59,7 @@ class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") 
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("edgar-spray-client")
   import system.dispatcher // execution context for futures below
-  var forms1:Option[XmlFormCollection]=None
+  var forms:Option[XmlFormCollection]=None
 
   def fetch():Future[Option[XmlFormCollection]] ={
     logger.debug("Calling into edgar for cik: "+cik)
@@ -84,21 +84,21 @@ class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") 
             val fm = XmlFormCollection(xml, xml \\ "feed" \ "entry")
             val sz = fm.entries.size
 
-            if(forms1.isEmpty) {
-              forms1 = Some(fm)
+            if(forms.isEmpty) {
+              forms = Some(fm)
             }else if (sz>0){
-              val newEntries = forms1.get.entries  ++ fm.entries
-              forms1= Some(forms1.get.copy(entries=newEntries))
+              val newEntries = forms.get.entries  ++ fm.entries
+              forms= Some(forms.get.copy(entries=newEntries))
             }
 
             logger.debug("Returned forms: " + sz)
             if (sz > 0) {
               // query until it returns 0
-              val start = forms1.get.entries.size
+              val start = forms.get.entries.size
               logger.debug("Launch loopTask with start=" + start)
               loopTask(start)
             } else {
-              p.success(forms1)
+              p.success(forms)
               shutdown()
             }
           }catch{
