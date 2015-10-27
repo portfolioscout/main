@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Await}
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
+import java.time.LocalDate
 
 class EdgarSpec extends FlatSpec with Matchers{
 
@@ -28,25 +29,19 @@ class EdgarSpec extends FlatSpec with Matchers{
   "WebFormFetcher" should "should be able to pull only forms since 20140101 for a Gotham Capital with cik 0001510387" in {
 
     val cik = "0001510387"
-    val date = "20140101"
-    logger.debug("first pull all forms")
-    val resultAsync = Await.result(new FormWebCollector(cik).fetch(), 60.seconds)
+    val date = "2014-01-01"
+    logger.debug("first pull all forms since date")
+    val resultAsync = Await.result(new FormWebCollector(cik, date).fetch(), 60.seconds)
     assert(resultAsync.isDefined)
     assert(resultAsync.get.entries.size>0)
     assert(resultAsync.get.cik == cik)
     assert(resultAsync.get.name.toLowerCase().matches(".*gotham.*"))
     val sz1= resultAsync.get.entries.size
     logger.debug("found forms: "+sz1)
-
-    logger.debug("then pull forms since "+date)
-    val resultAsync1 = Await.result(new FormWebCollector(cik, date).fetch(), 60.seconds)
-    assert(resultAsync1.isDefined)
-    assert(resultAsync1.get.entries.size>0)
-    assert(resultAsync1.get.cik == cik)
-    assert(resultAsync1.get.name.toLowerCase().matches(".*gotham.*"))
-    val sz2= resultAsync1.get.entries.size
-    logger.debug("found forms: "+sz2)
-    assert(sz2<sz1)
+    logger.debug("node text: "+(resultAsync.get.entries.last \ "content" \ "filing-date"))
+    val t1 = LocalDate.parse(resultAsync.get.entries.last \ "content" \ "filing-date" text)
+    var t2 = LocalDate.parse(date)
+    assert(t2.isBefore(t1) || t2 == t1)
   }
 
   "WebFormFetcher" should "should be not pull any forms with invalid cik=0001xyz" in {

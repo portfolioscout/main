@@ -16,6 +16,7 @@ object Build extends Build {
             "io.spray" % "spray-httpx_2.11" % "1.3.3",
             "io.spray" % "spray-client_2.11" % "1.3.3",
             "io.spray" % "spray-util_2.11" % "1.3.3",
+            "com.github.nscala-time" % "nscala-time_2.10" % "2.4.0",
             "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test"
       ),
       resolvers += Resolver.sonatypeRepo("public"),

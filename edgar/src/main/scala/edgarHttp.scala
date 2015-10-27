@@ -15,6 +15,8 @@ import spray.can.Http
 import spray.client.pipelining._
 import spray.util._
 import scala.xml.{Node, Elem, XML}
+import java.time.LocalDate
+
 
 case class ReqConfig(cik:String,
                       start:Int = 0,
@@ -28,8 +30,8 @@ case class ReqConfig(cik:String,
     url+
     "&CIK="+cik+
     "&type="+ftype+
-    "&dateb="+dateBefore+
-    "&owner="+owner+
+    //"&dateb="+dateBefore+
+    //"&owner="+owner+
     "&start="+start+
     "&count="+count+
     "&output="+output
@@ -38,9 +40,9 @@ case class ReqConfig(cik:String,
 
 case class XmlForm(entry:Node){
   val content = entry \ "content"
-  val filingDate = content \ "filing-date"
+  val filingDate = content \ "filing-date" text
   override def toString =
-  "filing date:"+filingDate.text
+  "filing date:"+filingDate
 }
 
 case class XmlFormCollection(xml: Elem, entries: Seq[Node]){
@@ -82,12 +84,26 @@ class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") 
           try {
             val xml = scala.xml.XML.loadString(s)
             val fm = XmlFormCollection(xml, xml \\ "feed" \ "entry")
-            val sz = fm.entries.size
+
+            // filter forms based on date
+            val ne = if(!dateBefore.isEmpty) {
+              val dt = LocalDate.parse(dateBefore)
+              fm.entries.filter{x=>{
+                val y = XmlForm(x)
+                val t = LocalDate.parse(y.filingDate)
+                t.isAfter(dt)
+              }}
+            } else {
+              fm.entries
+            }
+            val fm1 = fm.copy(entries = ne)
+            val sz = fm1.entries.size
+
 
             if(forms.isEmpty) {
-              forms = Some(fm)
+              forms = Some(fm1)
             }else if (sz>0){
-              val newEntries = forms.get.entries  ++ fm.entries
+              val newEntries = forms.get.entries  ++ fm1.entries
               forms= Some(forms.get.copy(entries=newEntries))
             }
 
