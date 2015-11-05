@@ -20,9 +20,9 @@ import java.time.LocalDate
 
 case class ReqConfig(cik:String,
                       start:Int = 0,
-                      dateBefore:String="",
+                      dateFrom:String="",
+                      dateTo:String="",
                       ftype:String="",
-                      owner:String="include", // TODO apparently bug n sec API. Owner=exclude is ignored.
                       count:Int=10,
                       output:String="atom",
                       url:String="http://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"){
@@ -30,8 +30,6 @@ case class ReqConfig(cik:String,
     url+
     "&CIK="+cik+
     "&type="+ftype+
-    //"&dateb="+dateBefore+
-    //"&owner="+owner+
     "&start="+start+
     "&count="+count+
     "&output="+output
@@ -57,11 +55,12 @@ case class XmlFormCollection(xml: Elem, entries: Seq[Node]){
     "\tlast:"+(if(!entries.isEmpty){XmlForm(entries.last)}else{""})
 }
 
-class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") extends LazyLogging {
+class FormWebCollector(cik:String, dateFrom:String="", dateTo:String="", formType:String="13F") extends LazyLogging {
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("edgar-spray-client")
   import system.dispatcher // execution context for futures below
   var forms:Option[XmlFormCollection]=None
+  private var _start =0
 
   def fetch():Future[Option[XmlFormCollection]] ={
     logger.debug("Calling into edgar for cik: "+cik)
@@ -70,7 +69,7 @@ class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") 
     def responseFuture(start:Int) = {
       val pipeline = sendReceive ~> unmarshal[String]
       pipeline {
-        val r = ReqConfig(cik, start, dateBefore, formType)
+        val r = ReqConfig(cik, start, dateFrom, dateTo, formType)
         logger.debug("GET: "+r.toString)
         Get(r toString)
       }
@@ -84,35 +83,42 @@ class FormWebCollector(cik:String, dateBefore:String="", formType:String="13F") 
           try {
             val xml = scala.xml.XML.loadString(s)
             val fm = XmlFormCollection(xml, xml \\ "feed" \ "entry")
+            val sz = fm.entries.size
+            logger.debug("Returned forms: " + sz)
 
+            _start +=  sz
             // filter forms based on date
-            val ne = if(!dateBefore.isEmpty) {
-              val dt = LocalDate.parse(dateBefore)
-              fm.entries.filter{x=>{
-                val y = XmlForm(x)
-                val t = LocalDate.parse(y.filingDate)
-                t.isAfter(dt)
-              }}
+            val ne = if(!dateFrom.isEmpty || !dateTo.isEmpty) {
+              fm.entries.filter{
+                x=>{
+                  val y = XmlForm(x)
+                  val t = LocalDate.parse(y.filingDate)
+                  (if(!dateFrom.isEmpty) (t.isAfter(LocalDate.parse(dateFrom)) ||
+                    t.isEqual(LocalDate.parse(dateFrom))
+                  ) else true) &&
+                    (if(!dateTo.isEmpty) (t.isBefore(LocalDate.parse(dateTo)) ||
+                      t.isEqual(LocalDate.parse(dateTo))
+                    ) else true)
+                }
+              }
             } else {
               fm.entries
             }
             val fm1 = fm.copy(entries = ne)
-            val sz = fm1.entries.size
-
+            val sz1 = fm1.entries.size
+            logger.debug("Filtered forms: " + sz1)
 
             if(forms.isEmpty) {
               forms = Some(fm1)
-            }else if (sz>0){
+            }else if (sz1>0){
               val newEntries = forms.get.entries  ++ fm1.entries
               forms= Some(forms.get.copy(entries=newEntries))
             }
 
-            logger.debug("Returned forms: " + sz)
             if (sz > 0) {
               // query until it returns 0
-              val start = forms.get.entries.size
-              logger.debug("Launch loopTask with start=" + start)
-              loopTask(start)
+              logger.debug("Launch loopTask with start=" + _start)
+              loopTask(_start)
             } else {
               p.success(forms)
               shutdown()

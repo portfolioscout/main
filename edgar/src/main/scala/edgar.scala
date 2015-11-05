@@ -6,7 +6,8 @@ import scala.util.{Success, Failure}
 
 case class Config(cik: String = "",
                   verbose: Boolean = false,
-                  dateBefore:String = "",
+                  dateFrom:String = "",
+                  dateTo:String = "",
                   mode: Option[Config=>Unit] = None)
 
 object Edgar{
@@ -17,7 +18,7 @@ object Edgar{
     def list(config: Config): Unit ={
       import scala.concurrent.ExecutionContext.Implicits.global
       logger.debug("option: "+config.mode + " "+config.cik)
-      new FormWebCollector(config.cik,config.dateBefore).fetch().onComplete({
+      new FormWebCollector(config.cik,dateFrom=config.dateFrom, dateTo=config.dateTo).fetch().onComplete({
         case(Success(forms)) =>
           if(forms.isEmpty){
             logger.info("No forms fetched")
@@ -35,10 +36,10 @@ object Edgar{
       head("edgar13f", "0.1")
       opt[String]("cik") action { (x, c) =>
         c.copy(cik = x) } text("cik of a fund")
-      opt[String]("date") action { (x, c) =>
-        c.copy(dateBefore = x) } text("pull forms since date in the form YYYYMMDD")
-      opt[Unit]("verbose") action { (_, c) =>
-        c.copy(verbose = true) } text("verbose output")
+      opt[String]("date-from") action { (x, c) =>
+        c.copy(dateFrom = x) } text("pull forms since date in the form YYYYMMDD")
+      opt[String]("date-to") action { (x, c) =>
+        c.copy(dateTo = x) } text("pull forms till date in the form YYYYMMDD")
       help("help") text("prints this usage text")
       cmd("list") action { (_, c) =>
         c.copy(mode = Some(list)) } text("list 13F forms.")
